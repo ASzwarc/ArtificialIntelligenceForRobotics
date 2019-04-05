@@ -507,20 +507,89 @@ def print_result(N, num_landmarks, result):
 ############## ENTER YOUR CODE BELOW HERE ###################
 
 def slam(data, N, num_landmarks, motion_noise, measurement_noise):
+    #variable initialization
     motion_weight = 1.0 / motion_noise
     measurement_weight = 1.0 / measurement_noise
-
+    size_x = 2 * (N + num_landmarks)
+    size_y = 2 * (N + num_landmarks)
+    landmark_start_index = 2*N
     Omega = matrix()
-    Omega.zero(N + num_landmarks, N + num_landmarks)
+    Omega.zero(size_x, size_y)
     Xi = matrix()
-    Xi.zero(1, N + num_landmarks)
+    Xi.zero(1, size_y)
     
-    for point in range(len(N)):
-        #landmark measurement
-        data[point][0]
-        #position measurement
-        data[point][1]
+    #initial position
+    Omega.value[0][0] = motion_weight
+    Omega.value[0][1] = 0
+    Xi.value[0][0] = motion_weight * data[0][1][0]
+    Omega.value[1][0] = 0
+    Omega.value[1][1] = motion_weight
+    Xi.value[0][1] = motion_weight * data[0][1][1]
 
+    def create_motion_constraint(point):
+        motion_constraint = matrix()
+        motion_constraint.zero(size_x, size_y)
+        #fill diagonal
+        for i in range(-1, 3):
+            motion_constraint.value[point + i][point + i] = motion_weight
+        #fill negative weights
+        motion_constraint.value[point - 1][point + 1] = -motion_weight
+        motion_constraint.value[point][point + 2] = -motion_weight
+        motion_constraint.value[point + 1][point - 1] = -motion_weight
+        motion_constraint.value[point + 2][point] = -motion_weight
+        
+        return motion_constraint
+
+    def create_motion_constraint_value(point):
+        constraint_value = matrix()
+        constraint_value.zero(1, size_y)
+
+        constraint_value.value[0][point - 1] = -motion_weight * data[point][1][0]
+        constraint_value.value[0][point] = -motion_weight * data[point][1][1]
+        constraint_value.value[0][point + 1] = motion_weight * data[point][1][0]
+        constraint_value.value[0][point + 2] = motion_weight * data[point][1][1]
+
+        return distance
+    
+    def create_measurement_constraint(point, motion_index):
+        landmark_constraint = matrix()
+        landmark_constraint.zero(size_x, size_y)
+        
+        for landmark in data[point][0]:
+            idx = landmark_start_index + 2 * landmark[0]
+            landmark_constraint[idx][motion_index] = -measurement_weight
+            landmark_constraint[idx + 1][motion_index + 1] = -measurement_weight
+            landmark_constraint[motion_index][idx] = -measurement_weight
+            landmark_constraint[motion_index + 1][idx + 1] = -measurement_weight
+            landmark_constraint[idx][idx] = measurement_weight
+            landmark_constraint[idx + 1][idx + 1] = measurement_weight
+        
+        return landmark_constraint
+
+    def create_measurement_constraint_value(point, motion_index):
+        constraint_value = matrix()
+        constraint_value.zero(1, size_y)
+        
+        for landmark in data[point][0]:
+            idx = landmark_start_index + 2 * landmark[0]
+            constraint_value[0][idx] = measurement_weight * landmark[1]
+            constraint_value[0][idx + 1] = measurement_weight * landmark[2]
+            constraint_value[0][motion_index] = -measurement_weight * landmark[1]
+            constraint_value[0][motion_index + 1] = -measurement_weight * landmark[2]
+        
+        return constraint_value
+
+    motion_index = 1
+    for point in range(1, len(N)):       
+        #create motion constraint based on position measurement
+        Omega += create_motion_constraint(motion_index)
+        Xi += create_motion_constraint_value(motion_index)
+        #create measurement constraint based on landmark measurement
+        Omega += create_measurement_constraint(point, motion_index)
+        Xi += create_measurement_constraint_value(point, motion_index)
+        motion_index += 2
+    
+    mu = Omega.inverse() * Xi
     return mu # Make sure you return mu for grading!
         
 ############### ENTER YOUR CODE ABOVE HERE ###################
@@ -557,8 +626,7 @@ test_data1 = [[[[1, 19.457599255548065, 23.8387362100849], [2, -13.1958075619672
               [[[4, 7.412136480918645, 15.388585962142429]], [14.008259661173426, 14.274756084260822]], 
               [[[4, -7.526138813444998, -0.4563942429717849]], [14.008259661173426, 14.274756084260822]], 
               [[[2, -6.299793150150058, 29.047830407717623], [4, -21.93551130411791, -13.21956810989039]], [14.008259661173426, 14.274756084260822]], 
-              [[[1, 15.796300959032276, 30.65769689694247], [2, -18.64370821983482, 17.380022987031367]], [14.008259661173426, 14.274756084260822]], [[1, 0.40311325410337906, 14.169429532679855], [2, -35.069349468466235, 2.4945558982439957]], [14.008259661173426, 14.274756084260822]], 
-              [[[1, -16.71340983241936, -2.777000269543834]], [-11.006096015782283, 16.699276945166858]],
+              [[[1, 15.796300959032276, 30.65769689694247], [2, -18.64370821983482, 17.380022987031367]], [14.008259661173426, 14.274756084260822]], [[1, 0.40311325410337906, 14.169429532679855], [2, -35.069349468466235, 2.4945558982439957]], [14.008259661173426, 14.274756084260822]], [[[1, -16.71340983241936, -2.777000269543834]], [-11.006096015782283, 16.699276945166858]],
               [[[1, -3.611096830835776, -17.954019226763958]], [-19.693482634035977, 3.488085684573048]], 
               [[[1, 18.398273354362416, -22.705102332550947]], [-19.693482634035977, 3.488085684573048]], 
               [[[2, 2.789312482883833, -39.73720193121324]], [12.849049222879723, -15.326510824972983]], 
