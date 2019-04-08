@@ -548,14 +548,11 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
         point_idx = point * 2
         for landmark in data[point][0]:
             land_idx = landmark_start_index + 2 * landmark[0]
-            landmark_constraint.value[land_idx][point_idx] = -measurement_weight
-            landmark_constraint.value[land_idx + 1][point_idx + 1] = -measurement_weight
-            landmark_constraint.value[point_idx][land_idx] = -measurement_weight
-            landmark_constraint.value[point_idx + 1][land_idx + 1] = -measurement_weight
-            landmark_constraint.value[land_idx][land_idx] = measurement_weight
-            landmark_constraint.value[land_idx + 1][land_idx + 1] = measurement_weight
-            landmark_constraint.value[point_idx][point_idx] += measurement_weight
-            landmark_constraint.value[point_idx + 1][point_idx + 1] += measurement_weight
+            for i in range(2):
+                landmark_constraint.value[land_idx + i][point_idx + i] = -measurement_weight
+                landmark_constraint.value[point_idx + i][land_idx + i] = -measurement_weight
+                landmark_constraint.value[land_idx + i][land_idx + i] = measurement_weight
+                landmark_constraint.value[point_idx + i][point_idx + i] += measurement_weight
         
         return landmark_constraint
 
@@ -565,10 +562,9 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
         point_idx = point * 2
         for landmark in data[point][0]:
             land_idx = landmark_start_index + 2 * landmark[0]
-            constraint_value.value[land_idx][0] = measurement_weight * landmark[1]
-            constraint_value.value[land_idx + 1][0] = measurement_weight * landmark[2]
-            constraint_value.value[point_idx][0] += -measurement_weight * landmark[1]
-            constraint_value.value[point_idx + 1][0] += -measurement_weight * landmark[2]
+            for i in range(2):
+                constraint_value.value[land_idx + i][0] = measurement_weight * landmark[i + 1]
+                constraint_value.value[point_idx + i][0] += -measurement_weight * landmark[i + 1]
         
         return constraint_value
 
@@ -588,9 +584,6 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
         #create measurement constraint based on landmark measurement
         Omega += create_measurement_constraint(point)
         Xi += create_measurement_constraint_value(point)
-
-    # Omega.show("Omega: ")
-    # Xi.show("Xi: ")
     
     mu = Omega.inverse() * Xi
     return mu # Make sure you return mu for grading!
