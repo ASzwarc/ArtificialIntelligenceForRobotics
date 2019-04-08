@@ -523,13 +523,12 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
         motion_constraint.zero(size_x, size_y)
         point_idx = 2 * point
         #fill diagonal
-        for i in range(-2, 2):
+        for i in range(4):
             motion_constraint.value[point_idx + i][point_idx + i] = motion_weight
         #fill negative weights
-        motion_constraint.value[point_idx][point_idx - 2] = -motion_weight
-        motion_constraint.value[point_idx + 1][point_idx - 1] = -motion_weight
-        motion_constraint.value[point_idx - 2][point_idx] = -motion_weight
-        motion_constraint.value[point_idx - 1][point_idx + 1] = -motion_weight
+        for i in range(2, 4):
+            motion_constraint.value[point_idx + i - 2][point_idx + i] = -motion_weight
+            motion_constraint.value[point_idx + i][point_idx + i - 2] = -motion_weight
         
         return motion_constraint
 
@@ -537,10 +536,9 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
         constraint_value = matrix()
         constraint_value.zero(size_x, 1)
         point_idx = 2 * point
-        constraint_value.value[point_idx - 2][0] = -motion_weight * data[point][1][0]
-        constraint_value.value[point_idx - 1][0] = -motion_weight * data[point][1][1]
-        constraint_value.value[point_idx][0] = motion_weight * data[point][1][0]
-        constraint_value.value[point_idx + 1][0] = motion_weight * data[point][1][1]
+        for i in range(2):
+            constraint_value.value[point_idx + i][0] = -motion_weight * data[point][1][i]
+            constraint_value.value[point_idx + i + 2][0] = motion_weight * data[point][1][i]
 
         return constraint_value
     
@@ -556,8 +554,8 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
             landmark_constraint.value[point_idx + 1][land_idx + 1] = -measurement_weight
             landmark_constraint.value[land_idx][land_idx] = measurement_weight
             landmark_constraint.value[land_idx + 1][land_idx + 1] = measurement_weight
-            landmark_constraint.value[point_idx][point_idx] = measurement_weight
-            landmark_constraint.value[point_idx + 1][point_idx + 1] = measurement_weight
+            landmark_constraint.value[point_idx][point_idx] += measurement_weight
+            landmark_constraint.value[point_idx + 1][point_idx + 1] += measurement_weight
         
         return landmark_constraint
 
@@ -575,16 +573,15 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
         return constraint_value
 
     #initial position
-    Omega.value[0][0] += motion_weight
-    Xi.value[0][0] += motion_weight * data[0][1][0]
-    Omega.value[1][1] += motion_weight
-    Xi.value[1][0] += motion_weight * data[0][1][1]
+    Omega.value[0][0] = 1.0
+    Omega.value[1][1] = 1.0
+    Xi.value[1][0] = world_size / 2.0
+    Xi.value[0][0] = world_size / 2.0
     #landmark
-    Omega += create_measurement_constraint(0)
-    Xi += create_measurement_constraint_value(0)
+    # Omega += create_measurement_constraint(0)
+    # Xi += create_measurement_constraint_value(0)
 
-    for point in range(1, N):
-        print("Point: {}".format(point))      
+    for point in range(len(data)):     
         #create motion constraint based on position measurement
         Omega += create_motion_constraint(point)
         Xi += create_motion_constraint_value(point)
@@ -592,8 +589,8 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
         Omega += create_measurement_constraint(point)
         Xi += create_measurement_constraint_value(point)
 
-    Omega.show("Omega: ")
-    Xi.show("Xi: ")
+    # Omega.show("Omega: ")
+    # Xi.show("Xi: ")
     
     mu = Omega.inverse() * Xi
     return mu # Make sure you return mu for grading!
@@ -616,9 +613,9 @@ motion_noise       = 2.0      # noise in robot motion
 measurement_noise  = 2.0      # noise in the measurements
 distance           = 20.0     # distance by which robot (intends to) move each iteratation 
 
-data = make_data(N, num_landmarks, world_size, measurement_range, motion_noise, measurement_noise, distance)
-result = slam(data, N, num_landmarks, motion_noise, measurement_noise)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
-print_result(N, num_landmarks, result)
+# data = make_data(N, num_landmarks, world_size, measurement_range, motion_noise, measurement_noise, distance)
+# result = slam(data, N, num_landmarks, motion_noise, measurement_noise)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+# print_result(N, num_landmarks, result)
 
 # -------------
 # Testing
@@ -730,9 +727,9 @@ test_data2 = [[[[0, 26.543274387283322, -6.262538160312672], [3, 9.9373968257997
 
 ### Uncomment the following three lines for test case 1 ###
 
-# result = slam(test_data1, 19, 5, 2.0, 2.0)
-# print_result(19, 5, result)
-# print(result)
+result = slam(test_data1, 20, 5, 2.0, 2.0)
+print_result(20, 5, result)
+print(result)
 
 
 ### Uncomment the following three lines for test case 2 ###
@@ -741,11 +738,8 @@ test_data2 = [[[[0, 26.543274387283322, -6.262538160312672], [3, 9.9373968257997
 # print_result(19, 5, result)
 # print(result)
 
-#-3, 5, 3, 10, 5, 2
-
 # test_simple = [[[[0, 10.0, 0.0]], [-3.0, 0.0]],  [[[0, 5.0, 0.0]], [5.0, 0.0]], [[[0, 2.0, 0.0]], [3.0, 0.0]]]
 
 # result = slam(test_simple, 3, 1, 1.0, 1.0)
 # print_result(3, 1, result)
 # print(result)
-
