@@ -552,8 +552,8 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
             Xi.value[n+b  ][0]        += -motion[b] / motion_noise
             Xi.value[n+b+2][0]        +=  motion[b] / motion_noise
 
-    Omega.show("Omega: ")
-    Xi.show("Xi: ")
+        Omega.show("Omega: ")
+        Xi.show("Xi: ")
 
     # compute best estimate
     mu = Omega.inverse() * Xi
@@ -567,11 +567,90 @@ def slam(data, N, num_landmarks, motion_noise, measurement_noise):
 #
 
 def online_slam(data, N, num_landmarks, motion_noise, measurement_noise):
-    #
-    #
-    # Enter your code here!
-    #
-    #
+    # Set the dimension of the filter
+    dim = 2 * num_landmarks + 2 
+
+    # make the constraint information matrix and vector
+    Omega = matrix()
+    Omega.zero(dim, dim)
+    Omega.value[0][0] = 1.0
+    Omega.value[1][1] = 1.0
+
+    Xi = matrix()
+    Xi.zero(dim, 1)
+    Xi.value[0][0] = world_size / 2.0
+    Xi.value[1][0] = world_size / 2.0
+
+    for i in range(len(data)):
+        measurement = data[i][0]
+        motion = data[i][1]
+
+        # integrate the measurements
+        for j in range(len(measurement)):
+    
+            # m is the index of the landmark coordinate in the matrix/vector
+            m = 2 * measurement[j][0] + 2
+    
+            # update the information maxtrix/vector based on the measurement
+            for b in range(2):
+                Omega.value[b][b]       +=  1.0 / measurement_noise
+                Omega.value[m+b][m+b]   +=  1.0 / measurement_noise
+                Omega.value[b][m+b]     += -1.0 / measurement_noise
+                Omega.value[m+b][b]     += -1.0 / measurement_noise
+                Xi.value[b][0]          += -measurement[j][1+b] / measurement_noise
+                Xi.value[m+b][0]        +=  measurement[j][1+b] / measurement_noise
+
+        # update the information maxtrix/vector based on the robot motion
+        Omega = Omega.expand(dim + 2, dim + 2, [0, 1,  *range(4, dim + 2)], [0, 1,  *range(4, dim + 2)])
+        Xi = Xi.expand(dim + 2, 1, [0, 1, *range(4, dim + 2)], [0])
+
+        for b in range(4):
+            Omega.value[b][b] +=  1.0 / motion_noise
+        for b in range(2):
+            Omega.value[b  ][b+2] += -1.0 / motion_noise
+            Omega.value[b+2][b  ] += -1.0 / motion_noise
+            Xi.value[b  ][0]        += -motion[b] / motion_noise
+            Xi.value[b+2][0]        +=  motion[b] / motion_noise
+
+        Omega.show("Omega: ")
+        Xi.show("Xi: ")
+
+        # A = matrix()
+        # A.zero(2, dim)
+        A = Omega.take([0, 1], [*range(2, dim + 2)])
+        
+        # B = matrix()
+        # B.zero(2, 2)
+        B = Omega.take([0,1], [0,1])
+        
+        # C = matrix()
+        # C.zero(2, 1)
+        C = Xi.take([0, 1], [0])
+
+        # Omega_prim = matrix()
+        # Omega_prim.zero(dim, dim)
+        Omega_prim = Omega.take([*range(2, dim + 2)], [*range(2, dim + 2)])
+
+        # Xi_prim = matrix()
+        # Xi_prim.zero(dim, 1)
+        Xi_prim = Xi.take([*range(2, dim + 2)], [0])
+
+        # A_T = matrix()
+        A_T = A.transpose()
+
+        # B_inv = matrix()
+        B_inv = B.inverse()
+
+        A_TB_inv = A_T * B_inv
+
+        Omega = Omega_prim - (A_TB_inv * A)
+        Xi = Xi_prim - (A_TB_inv * C)
+
+    # compute best estimate
+    mu = Omega.inverse() * Xi
+
+    mu.show("Mu: ")
+
     return mu, Omega # make sure you return both of these matrices to be marked correct.
 
 # --------------------------------
@@ -691,8 +770,10 @@ answer_omega1      = matrix([[0.36603773584905663, 0.0, -0.169811320754717, 0.0,
                              [-0.1811320754716981, 0.0, -0.4056603773584906, 0.0, -0.360377358490566, 0.0, 1.2339622641509433, 0.0],
                              [0.0, -0.1811320754716981, 0.0, -0.4056603773584906, 0.0, -0.360377358490566, 0.0, 1.2339622641509433]])
 
-#result = online_slam(testdata1, 5, 3, 2.0, 2.0)
-#solution_check(result, answer_mu1, answer_omega1)
+result = online_slam(testdata1, 5, 3, 2.0, 2.0)
+print("SLAM:")
+#result2 = slam(testdata1, 5, 3, 2.0, 2.0)
+solution_check(result, answer_mu1, answer_omega1)
 
 
 # -----------
@@ -720,33 +801,3 @@ answer_omega2      = matrix([[0.22871751620895048, 0.0, -0.11351536555795691, 0.
 
 #result = online_slam(testdata2, 6, 2, 3.0, 4.0)
 #solution_check(result, answer_mu2, answer_omega2)
-
-test_data1 = [[[[1, 19.457599255548065, 23.8387362100849], [2, -13.195807561967236, 11.708840328458608], [3, -30.0954905279171, 15.387879242505843]], [-12.2607279422326, -15.801093326936487]], 
-              [[[2, -0.4659930049620491, 28.088559771215664], [4, -17.866382374890936, -16.384904503932]], [-12.2607279422326, -15.801093326936487]],
-              [[[4, -6.202512900833806, -1.823403210274639]], [-12.2607279422326, -15.801093326936487]],
-              [[[4, 7.412136480918645, 15.388585962142429]], [14.008259661173426, 14.274756084260822]],
-              [[[4, -7.526138813444998, -0.4563942429717849]], [14.008259661173426, 14.274756084260822]],
-              [[[2, -6.299793150150058, 29.047830407717623], [4, -21.93551130411791, -13.21956810989039]], [14.008259661173426, 14.274756084260822]],
-              [[[1, 15.796300959032276, 30.65769689694247], [2, -18.64370821983482, 17.380022987031367]], [14.008259661173426, 14.274756084260822]],
-              [[[1, 0.40311325410337906, 14.169429532679855], [2, -35.069349468466235, 2.4945558982439957]], [14.008259661173426, 14.274756084260822]],
-              [[[1, -16.71340983241936, -2.777000269543834]], [-11.006096015782283, 16.699276945166858]],
-              [[[1, -3.611096830835776, -17.954019226763958]], [-19.693482634035977, 3.488085684573048]],
-              [[[1, 18.398273354362416, -22.705102332550947]], [-19.693482634035977, 3.488085684573048]],
-              [[[2, 2.789312482883833, -39.73720193121324]], [12.849049222879723, -15.326510824972983]],
-              [[[1, 21.26897046581808, -10.121029799040915], [2, -11.917698965880655, -23.17711662602097], [3, -31.81167947898398, -16.7985673023331]], [12.849049222879723, -15.326510824972983]],
-              [[[1, 10.48157743234859, 5.692957082575485], [2, -22.31488473554935, -5.389184118551409], [3, -40.81803984305378, -2.4703329790238118]], [12.849049222879723, -15.326510824972983]],
-              [[[0, 10.591050242096598, -39.2051798967113], [1, -3.5675572049297553, 22.849456408289125], [2, -38.39251065320351, 7.288990306029511]], [12.849049222879723, -15.326510824972983]],
-              [[[0, -3.6225556479370766, -25.58006865235512]], [-7.8874682868419965, -18.379005523261092]],
-              [[[0, 1.9784503557879374, -6.5025974151499]], [-7.8874682868419965, -18.379005523261092]],
-              [[[0, 10.050665232782423, 11.026385307998742]], [-17.82919359778298, 9.062000642947142]],
-              [[[0, 26.526838150174818, -0.22563393232425621], [4, -33.70303936886652, 2.880339841013677]], [-17.82919359778298, 9.062000642947142]]]
-
-result = slam(test_data1, 20, 5, 2.0, 2.0)
-print_result(20, 5, result)
-print(result)
-
-# test_simple = [[[[0, 10.0, 0.0]], [-3.0, 0.0]],  [[[0, 5.0, 0.0]], [5.0, 0.0]], [[[0, 2.0, 0.0]], [3.0, 0.0]]]
-
-# result = slam(test_simple, 3, 1, 1.0, 1.0)
-# print_result(3, 1, result)
-# print(result)
