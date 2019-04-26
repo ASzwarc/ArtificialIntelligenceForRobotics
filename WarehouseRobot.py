@@ -62,7 +62,7 @@
 #
 # You may use our test function below, solution_check(),
 # to test your code for a variety of input parameters. 
-
+import math
 warehouse = [[ 1, 2, 3],
              [ 0, 0, 0],
              [ 0, 0, 0]]
@@ -76,9 +76,68 @@ todo = [2, 1]
 # modify code below
 # ----------------------------------------
 def plan(warehouse, dropzone, todo):
+
+    def A_star(warehouse, start, goal):
+
+        def heuristic(goal, point):
+            return math.sqrt((goal[0] - point[0]) ** 2 + (goal[1] - point[1]) ** 2)
+
+        def get_neighbors(x, y, goal):
+            available_moves = [[-1, -1], [-1, 0], [-1, 1],
+                               [ 0, -1],          [ 0, 1],
+                               [ 1, -1], [ 1, 0], [ 1, 1]]
+            neighbors = []
+            for move in available_moves:
+                new_x = x + move[0]
+                new_y = y + move[1]
+                if new_x >= 0 and new_x < len(warehouse) and new_y >= 0 and new_y < len(warehouse[0]) and (warehouse[new_x][new_y] == 0 or [new_x, new_y] == goal):
+                    neighbors.append([new_x, new_y])
+            return neighbors
+
+        def get_cost(current, next_cell):
+            cost = 1
+            if abs(current[0] - next_cell[0]) == 1 and abs(current[1] - next_cell[1]) == 1:
+                cost = 1.5
+            return cost
+
+        frontier = [[0, start[0], start[1]]]
+        came_from = {}
+        cost_so_far = {}
+        came_from[(start[0], start[1])] = None
+        cost_so_far[(start[0], start[1])] = 0
+        final_cost = 0
+        while len(frontier) != 0:
+            frontier.sort(reverse=True)
+            _, current_x, current_y = frontier.pop()
+
+            if current_x == goal[0] and current_y == goal[1]:
+                final_cost = cost_so_far[(current_x, current_y)]
+                break
+            
+            for next_cell in get_neighbors(current_x, current_y, goal):
+                new_cost = cost_so_far[(current_x, current_y)] + get_cost([current_x, current_y], next_cell)
+                if (next_cell[0], next_cell[1]) not in cost_so_far or ((next_cell[0], next_cell[1]) in cost_so_far and new_cost < cost_so_far[(next_cell[0], next_cell[1])]):
+                    cost_so_far[(next_cell[0], next_cell[1])] = new_cost
+                    priority = new_cost + heuristic(goal, next_cell)
+                    frontier.append([priority, next_cell[0], next_cell[1]])
+                    came_from[(next_cell[0], next_cell[1])] = (current_x, current_y) 
+        
+        return final_cost
+
+    def get_position_of(package):
+        for i in range(len(warehouse)):
+            if package in warehouse[i]:
+                return [i, warehouse[i].index(package)]
+
     cost = 0
+    warehouse[dropzone[0]][dropzone[1]] = 0 #to remove stupid 'x'
+    for package in todo:
+        goal = get_position_of(package)
+        cost += A_star(warehouse, dropzone, goal)
+        warehouse[goal[0]][goal[1]] = 0
+        cost += A_star(warehouse, goal, dropzone)
+
     return cost
-    
 ################# TESTING ##################
        
 # ------------------------------------------
