@@ -1,0 +1,1 @@
+Repository of solutions for Udacity's course - Artifical Intelligence for Robotics.
